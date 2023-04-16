@@ -118,6 +118,130 @@ namespace ApiAton.Controllers
             return StatusCode(403);
         }
 
+        [HttpPut("UpdatePersonalData")]
+        public async Task<ActionResult> UpdatePersonalData(string login, string password, string? loginForUpdate, string? newName, int? newGender, DateTime? newBirthday)
+        {
+            var log = loginForUpdate ?? login;
+
+            var currentUser = _context.Users.SingleOrDefault(u => u.Login == log);
+
+            if (currentUser != null )
+            {
+                if (_context.Users.Any(u => u.Login == login && u.Password == password && (u.Admin || currentUser.RevokedOn == null)))
+                {
+                    currentUser.Name = newName ?? currentUser.Name;
+                    currentUser.Gender = newGender ?? currentUser.Gender;
+                    currentUser.Birthday = newBirthday ?? currentUser.Birthday;
+                    await _context.SaveChangesAsync();
+                    return Ok("Данные изменены");
+                }
+
+                return StatusCode(403);
+            }
+
+            return StatusCode(404);
+        }
+
+        [HttpPut("UpdatePassword")]
+        public async Task<ActionResult> UpdatePassword(string login, string password, string newPassword, string? loginForUpdate)
+        {
+            var log = loginForUpdate ?? login;
+
+            var currentUser = _context.Users.SingleOrDefault(u => u.Login == log);
+
+            if (currentUser != null)
+            {
+                if (_context.Users.Any(u => u.Login == login && u.Password == password && (u.Admin || currentUser.RevokedOn == null)))
+                {
+                    currentUser.Password = newPassword;
+                    await _context.SaveChangesAsync();
+                    return Ok("Данные изменены");
+                }
+
+                return StatusCode(403);
+            }
+
+            return StatusCode(404);
+        }
+
+        [HttpPut("UpdateLogin")]
+        public async Task<ActionResult> UpdateLogin(string login, string password, string newLogin, string? loginForUpdate)
+        {
+            if (_context.Users.Any(u => u.Login == newLogin))
+            {
+                return BadRequest("Данный логин уже существует");
+            }
+
+            var log = loginForUpdate ?? login;
+
+            var currentUser = _context.Users.SingleOrDefault(u => u.Login == log);
+
+            if (currentUser != null)
+            {
+                if (_context.Users.Any(u => u.Login == login && u.Password == password && (u.Admin || currentUser.RevokedOn == null)))
+                {
+                    currentUser.Login = newLogin;
+                    await _context.SaveChangesAsync();
+                    return Ok("Данные изменены");
+                }
+
+                return StatusCode(403);
+            }
+
+            return StatusCode(404);
+        }
+
+        [HttpPut("RestoreUser")]
+        public async Task<ActionResult> RestoreUser(string login, string password, string loginForRestore)
+        {
+            var currentUser = _context.Users.SingleOrDefault(u => u.Login == loginForRestore);
+
+            if (currentUser == null)
+            {
+                return BadRequest("Данного пользователя не существует");
+            }
+
+            if (_context.Users.Any(u => u.Login == login && u.Password == password && u.Admin))
+            {
+                currentUser.RevokedBy = null;
+                currentUser.RevokedOn = null;
+
+                await _context.SaveChangesAsync();
+                return Ok("Пользователь востановлен");
+            }
+
+            return StatusCode(403);
+        }
+
+        [HttpDelete("DeleteUser")]
+        public async Task<ActionResult> DeleteUser(string login, string password, string loginForDelete, bool isSoft)
+        {
+            var currentUser = _context.Users.SingleOrDefault(u => u.Login == loginForDelete);
+
+            if (currentUser == null)
+            {
+                return BadRequest("Данного пользователя не существует");
+            }
+
+            if (_context.Users.Any(u => u.Login == login && u.Password == password && u.Admin))
+            {
+                if (isSoft)
+                {
+                    currentUser.RevokedBy = login;
+                    currentUser.RevokedOn = DateTime.Now;
+                    await _context.SaveChangesAsync();
+                    return Ok("Пользователь удален(Мягкое удаление)");
+                }
+
+                _context.Users.Remove(currentUser);
+                await _context.SaveChangesAsync();
+                return Ok("Пользователь удален(Жесткое удаление)");
+            }
+
+            return StatusCode(403);
+        }
+
+
 
     }
 }
