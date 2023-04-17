@@ -14,9 +14,7 @@ namespace ApiAton.Controllers
         public async Task<ActionResult> GetAllActiveUser(string login, string password)
         {
             if (Helper.Instance.isAdmin(login, password))
-            {
                 return Ok(_context.Users.Where(u => u.RevokedOn == null).OrderBy(u => u.CreatedOn));
-            }
 
             return StatusCode(403);
         }
@@ -27,9 +25,7 @@ namespace ApiAton.Controllers
             if (Helper.Instance.isAdmin(login, password))
             {
                 if (!_context.Users.Any(u => u.Login == loginForSearch))
-                {
                     return StatusCode(404);
-                }
 
                 return Ok(_context.Users.Where(u => u.Login == loginForSearch)
                     .Select(u => new {
@@ -63,9 +59,7 @@ namespace ApiAton.Controllers
                 var dataList = _context.Users.Where(u => u.Birthday.HasValue).ToList().Where(u => DateTime.Now.Year - u.Birthday.GetValueOrDefault().Year! > age).ToList();
 
                 if (dataList.Count == 0)
-                {
                     return StatusCode(404);
-                }
 
                 return Ok(dataList);
             }
@@ -122,6 +116,7 @@ namespace ApiAton.Controllers
 
                 _context.Users.Add(newUser);
                 await _context.SaveChangesAsync();
+
                 return Ok("Пользователь добавлен");
 
             }
@@ -161,7 +156,9 @@ namespace ApiAton.Controllers
                     currentUser.Birthday = newBirthday ?? currentUser.Birthday;
                     currentUser.ModifiedBy = log;
                     currentUser.ModifiedOn = DateTime.Now;
+
                     await _context.SaveChangesAsync();
+
                     return Ok("Данные изменены");
                 }
 
@@ -188,7 +185,9 @@ namespace ApiAton.Controllers
                     currentUser.Password = newPassword;
                     currentUser.ModifiedBy = log;
                     currentUser.ModifiedOn = DateTime.Now;
+
                     await _context.SaveChangesAsync();
+
                     return Ok("Данные изменены");
                 }
 
@@ -234,9 +233,7 @@ namespace ApiAton.Controllers
             var currentUser = _context.Users.SingleOrDefault(u => u.Login == loginForRestore);
 
             if (currentUser == null)
-            {
                 return BadRequest("Данного пользователя не существует");
-            }
 
             if (_context.Users.Any(u => u.Login == login && u.Password == password && u.Admin))
             {
@@ -246,6 +243,7 @@ namespace ApiAton.Controllers
                 currentUser.ModifiedOn = DateTime.Now;
 
                 await _context.SaveChangesAsync();
+
                 return Ok("Пользователь востановлен");
             }
 
@@ -258,9 +256,7 @@ namespace ApiAton.Controllers
             var currentUser = _context.Users.SingleOrDefault(u => u.Login == loginForDelete);
 
             if (currentUser == null)
-            {
                 return BadRequest("Данного пользователя не существует");
-            }
 
             if (Helper.Instance.isAdmin(login, password))
             {
@@ -270,19 +266,19 @@ namespace ApiAton.Controllers
                     currentUser.RevokedOn = DateTime.Now;
                     currentUser.ModifiedBy = login;
                     currentUser.ModifiedOn = DateTime.Now;
+
                     await _context.SaveChangesAsync();
+
                     return Ok("Пользователь удален(Мягкое удаление)");
                 }
 
                 _context.Users.Remove(currentUser);
                 await _context.SaveChangesAsync();
+
                 return Ok("Пользователь удален(Жесткое удаление)");
             }
 
             return StatusCode(403);
         }
-
-
-
     }
 }
