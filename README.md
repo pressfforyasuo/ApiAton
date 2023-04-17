@@ -12,12 +12,12 @@
 ```c#
 protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 {
-    optionsBuilder.UseSqlServer("Data Source=localhost\\SQLEXPRESS01;Initial Catalog=User;TrustServerCertificate=True;Integrated Security=True;Pooling=True");
+    optionsBuilder.UseSqlServer("Data Source=localhost\\*;Initial Catalog=User;TrustServerCertificate=True;Integrated Security=True;Pooling=True");
 }
 
 ```
 
-<li>Создадим sql запрос в котором содержи</li>
+<li>Создадим sql запрос в котором содержится данный код</li>
 
 ```sql
 CREATE TABLE Users (
