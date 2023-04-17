@@ -1,4 +1,5 @@
 ﻿using ApiAton.Model;
+using ApiAton.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ApiAton.Controllers
@@ -7,12 +8,12 @@ namespace ApiAton.Controllers
     [ApiController]
     public class UsersController : ControllerBase
     {
-        private readonly UserContext _context = new();
+        public static readonly UserContext _context = new();
 
         [HttpGet("GetAllActiveUser")]
-        public async Task<ActionResult<IOrderedQueryable<User>>> GetAllActiveUser(string login, string password)
+        public async Task<ActionResult> GetAllActiveUser(string login, string password)
         {
-            if (_context.Users.Any(u => u.Login == login && u.Password == password && u.Admin))
+            if (Helper.Instance.isAdmin(login, password))
             {
                 return Ok(_context.Users.Where(u => u.RevokedOn == null).OrderBy(u => u.CreatedOn));
             }
@@ -21,9 +22,9 @@ namespace ApiAton.Controllers
         }
 
         [HttpGet("GetUser")]
-        public async Task<ActionResult<User>> GetUser(string login, string password, string loginForSearch)
+        public async Task<ActionResult> GetUser(string login, string password, string loginForSearch)
         {
-            if (_context.Users.Any(u => u.Login == login && u.Password == password && u.Admin))
+            if (Helper.Instance.isAdmin(login, password))
             {
                 if (!_context.Users.Any(u => u.Login == loginForSearch))
                 {
@@ -44,7 +45,7 @@ namespace ApiAton.Controllers
         }
 
         [HttpGet("GetMe")]
-        public async Task<ActionResult<User>> GetMe(string login, string password)
+        public async Task<ActionResult> GetMe(string login, string password)
         {
             if (_context.Users.Any(u => u.Login == login && u.Password == password && u.RevokedOn == null))
             {
@@ -55,27 +56,11 @@ namespace ApiAton.Controllers
         }
 
         [HttpGet("GetUsersByAge")]
-        public async Task<ActionResult<List<User>>> GetUsersByAge(string login, string password, int age)
+        public async Task<ActionResult> GetUsersByAge(string login, string password, int age)
         {
-            if (_context.Users.Any(u => u.Login == login && u.Password == password && u.Admin))
+            if (Helper.Instance.isAdmin(login, password))
             {
-                var dataList = _context.Users.Select(u => new
-                {
-                    u.Guid,
-                    u.Name,
-                    u.Gender,
-                    u.Admin,
-                    u.CreatedBy,
-                    u.CreatedOn,
-                    u.Login,
-                    u.Password,
-                    u.ModifiedBy,
-                    u.ModifiedOn,
-                    u.RevokedBy,
-                    u.RevokedOn,
-                    u.Birthday,
-                    age = DateTime.Now.Year - u.Birthday.GetValueOrDefault().Year
-                }).ToList().Where(u => u.age > age).ToList();
+                var dataList = _context.Users.Where(u => u.Birthday.HasValue).ToList().Where(u => DateTime.Now.Year - u.Birthday.GetValueOrDefault().Year! > age).ToList();
 
                 if (dataList.Count == 0)
                 {
@@ -89,27 +74,52 @@ namespace ApiAton.Controllers
         }
 
         [HttpPost("CreateUser")]
-        public async Task<ActionResult> CreteUser(string login, string password, string newLogin, string newPassword, string newName, int newGender, DateTime? newBirthday, bool isAdmin)
+        public async Task<ActionResult> CreteUser(string login, string password, string newLogin, string newPassword, string newName, int? newGender, DateTime? newBirthday, bool isAdmin)
         {
-            if (_context.Users.Any(u => u.Login == login && u.Password == password && u.Admin))
+            if (Helper.Instance.isAdmin(login, password))
             {
                 if (_context.Users.Any(u => u.Login == newLogin))
-                {
                     return BadRequest("Данный логин уже используется");
+
+                if (!Helper.Instance.IsLettersAndNumbers(newLogin))
+                    return BadRequest("Данный логин невалиден");
+
+                if (!Helper.Instance.IsLettersAndNumbers(newPassword))
+                    return BadRequest("Данный пароль невалиден");
+
+                if (!Helper.Instance.IsLetters(newName))
+                    return BadRequest("Данное имя невалидно");
+
+                switch (newGender)
+                {
+                    case 0:
+                        break;
+                    case 1:
+                        break;
+                    case 2:
+                        break;
+                    case null:
+                        break;
+                    default:
+                        return BadRequest("Пол не валиден");
                 }
+
 
                 var newUser = new User
                 {
-                    Guid = Guid.NewGuid().ToString(),
+                    Guid = Guid.NewGuid(),
                     Login = newLogin,
                     Password = newPassword,
                     Name = newName,
-                    Gender = newGender,
+                    Gender = newGender ?? 2,
                     Birthday = newBirthday ?? null,
                     Admin = isAdmin,
-                    CreatedOn = DateTime.UtcNow,
-                    CreatedBy = login
+                    CreatedOn = DateTime.Now,
+                    CreatedBy = login,
+                    ModifiedBy = login,
+                    ModifiedOn = DateTime.Now
                 };
+
                 _context.Users.Add(newUser);
                 await _context.SaveChangesAsync();
                 return Ok("Пользователь добавлен");
@@ -129,9 +139,28 @@ namespace ApiAton.Controllers
             {
                 if (_context.Users.Any(u => u.Login == login && u.Password == password && (u.Admin || currentUser.RevokedOn == null)))
                 {
+                    if (!Helper.Instance.IsLetters(newName))
+                        return BadRequest("Данное имя невалидно");
+
+                    switch (newGender)
+                    {
+                        case 0:
+                            break;
+                        case 1:
+                            break;
+                        case 2:
+                            break;
+                        case null:
+                            break;
+                        default:
+                            return BadRequest("Пол не валиден");
+                    }
+
                     currentUser.Name = newName ?? currentUser.Name;
                     currentUser.Gender = newGender ?? currentUser.Gender;
                     currentUser.Birthday = newBirthday ?? currentUser.Birthday;
+                    currentUser.ModifiedBy = log;
+                    currentUser.ModifiedOn = DateTime.Now;
                     await _context.SaveChangesAsync();
                     return Ok("Данные изменены");
                 }
@@ -153,7 +182,12 @@ namespace ApiAton.Controllers
             {
                 if (_context.Users.Any(u => u.Login == login && u.Password == password && (u.Admin || currentUser.RevokedOn == null)))
                 {
+                    if (!Helper.Instance.IsLettersAndNumbers(newPassword))
+                        return BadRequest("Данный пароль невалиден");
+
                     currentUser.Password = newPassword;
+                    currentUser.ModifiedBy = log;
+                    currentUser.ModifiedOn = DateTime.Now;
                     await _context.SaveChangesAsync();
                     return Ok("Данные изменены");
                 }
@@ -168,9 +202,7 @@ namespace ApiAton.Controllers
         public async Task<ActionResult> UpdateLogin(string login, string password, string newLogin, string? loginForUpdate)
         {
             if (_context.Users.Any(u => u.Login == newLogin))
-            {
                 return BadRequest("Данный логин уже существует");
-            }
 
             var log = loginForUpdate ?? login;
 
@@ -178,9 +210,14 @@ namespace ApiAton.Controllers
 
             if (currentUser != null)
             {
+                if (!Helper.Instance.IsLettersAndNumbers(newLogin))
+                    return BadRequest("Данный логин невалиден");
+
                 if (_context.Users.Any(u => u.Login == login && u.Password == password && (u.Admin || currentUser.RevokedOn == null)))
                 {
                     currentUser.Login = newLogin;
+                    currentUser.ModifiedBy = log;
+                    currentUser.ModifiedOn = DateTime.Now;
                     await _context.SaveChangesAsync();
                     return Ok("Данные изменены");
                 }
@@ -205,6 +242,8 @@ namespace ApiAton.Controllers
             {
                 currentUser.RevokedBy = null;
                 currentUser.RevokedOn = null;
+                currentUser.ModifiedBy = login;
+                currentUser.ModifiedOn = DateTime.Now;
 
                 await _context.SaveChangesAsync();
                 return Ok("Пользователь востановлен");
@@ -223,12 +262,14 @@ namespace ApiAton.Controllers
                 return BadRequest("Данного пользователя не существует");
             }
 
-            if (_context.Users.Any(u => u.Login == login && u.Password == password && u.Admin))
+            if (Helper.Instance.isAdmin(login, password))
             {
                 if (isSoft)
                 {
                     currentUser.RevokedBy = login;
                     currentUser.RevokedOn = DateTime.Now;
+                    currentUser.ModifiedBy = login;
+                    currentUser.ModifiedOn = DateTime.Now;
                     await _context.SaveChangesAsync();
                     return Ok("Пользователь удален(Мягкое удаление)");
                 }

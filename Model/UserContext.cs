@@ -13,7 +13,7 @@ namespace ApiAton.Model
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            optionsBuilder.UseSqlite("Filename=User.sqlite");
+            optionsBuilder.UseSqlServer("Data Source=localhost\\SQLEXPRESS01;Initial Catalog=User;TrustServerCertificate=True;Integrated Security=True;Pooling=True");
         }
     }
 }
