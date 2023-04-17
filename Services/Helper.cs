@@ -44,7 +44,7 @@ namespace ApiAton.Services
 
         public bool isAdmin(string login, string password)
         {
-            if (UsersController._context.Users.Any(u => u.Login == login && u.Password == password && u.Admin))
+            if (UsersController._context.Users.Any(u => u.Login == login && u.Password == password && u.Admin && u.RevokedOn == null))
             {
                 return true;
             }

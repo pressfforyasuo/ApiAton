@@ -177,11 +177,21 @@ namespace ApiAton.Controllers
 
             if (currentUser != null)
             {
-                if (_context.Users.Any(u => u.Login == login && u.Password == password && (u.Admin || currentUser.RevokedOn == null)))
+                if (Helper.Instance.isAdmin(login, password) && loginForUpdate != null)
                 {
                     if (!Helper.Instance.IsLettersAndNumbers(newPassword))
                         return BadRequest("Данный пароль невалиден");
 
+                    currentUser.Password = newPassword;
+                    currentUser.ModifiedBy = log;
+                    currentUser.ModifiedOn = DateTime.Now;
+
+                    await _context.SaveChangesAsync();
+
+                    return Ok("Данные изменены");
+                }
+                else if (currentUser.RevokedOn == null && loginForUpdate == null)
+                {
                     currentUser.Password = newPassword;
                     currentUser.ModifiedBy = log;
                     currentUser.ModifiedOn = DateTime.Now;
@@ -212,15 +222,27 @@ namespace ApiAton.Controllers
                 if (!Helper.Instance.IsLettersAndNumbers(newLogin))
                     return BadRequest("Данный логин невалиден");
 
-                if (_context.Users.Any(u => u.Login == login && u.Password == password && (u.Admin || currentUser.RevokedOn == null)))
+                if (Helper.Instance.isAdmin(log, password) && loginForUpdate != null)
                 {
                     currentUser.Login = newLogin;
                     currentUser.ModifiedBy = log;
                     currentUser.ModifiedOn = DateTime.Now;
+
                     await _context.SaveChangesAsync();
+
                     return Ok("Данные изменены");
                 }
+                else if (loginForUpdate == null && currentUser.RevokedOn == null)
+                {
+                    currentUser.Login = newLogin;
+                    currentUser.ModifiedBy = log;
+                    currentUser.ModifiedOn = DateTime.Now;
 
+                    await _context.SaveChangesAsync();
+
+                    return Ok("Данные изменены");
+                }
+                
                 return StatusCode(403);
             }
 
@@ -235,7 +257,7 @@ namespace ApiAton.Controllers
             if (currentUser == null)
                 return BadRequest("Данного пользователя не существует");
 
-            if (_context.Users.Any(u => u.Login == login && u.Password == password && u.Admin))
+            if (Helper.Instance.isAdmin(login, password))
             {
                 currentUser.RevokedBy = null;
                 currentUser.RevokedOn = null;
